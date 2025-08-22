@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ALTAI-BAD — Голосовой консультант по здоровью</title>
+  <style>
+    :root{
+      --brand:#0b7a4a; --brand-600:#0a6a41; --brand-50:#e8f5ef;
+      --ink:#0f172a; --muted:#475569; --bg:#f6f7f8;
+      --radius:28px; --ring:#e8f7f0; --pad:clamp(16px,4vw,24px);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+    .wrap{min-height:100svh;min-height:100dvh;display:grid;place-items:center;
+      padding:calc(var(--pad) + env(safe-area-inset-top)) var(--pad) calc(var(--pad) + env(safe-area-inset-bottom))}
+    .card{width:100%;max-width:640px;background:#fff;border-radius:36px;
+      box-shadow:0 24px 80px rgba(15,23,42,.12);border:1px solid #eef4f1;position:relative;
+      max-height:calc(100dvh - 2*var(--pad) - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+    .inner{padding:clamp(18px, 4.5vw, 28px);overflow:auto;-webkit-overflow-scrolling:touch}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+    .brand svg{width:clamp(28px, 7vw, 36px);height:auto}
+    .brand-title{font-weight:800;letter-spacing:.5px;color:var(--brand);font-size:clamp(22px, 6vw, 28px)}
+    .h1{font-size:clamp(22px, 7.5vw, 36px);line-height:1.15;font-weight:800;color:#0f172a;margin:18px 0 10px}
+    .lead{font-size:clamp(16px, 5.3vw, 22px);line-height:1.35;color:#111827;opacity:.9;margin:0}
+    .mic-wrap{display:grid;place-items:center;margin:clamp(16px, 5vw, 26px) 0}
+    .mic-ring{width:clamp(200px, 56vw, 264px);height:clamp(200px, 56vw, 264px);border-radius:999px;
+      background:radial-gradient(closest-side, #0e7146 0%, #085e3a 90%);display:grid;place-items:center;
+      box-shadow:0 20px 60px rgba(11,122,74,.35), inset 0 0 0 14px #e9f6f0, inset 0 0 0 28px #f4fbf7;transition:all .3s ease}
+    .mic-ring.listening{background:radial-gradient(closest-side, #dc2626 0%, #991b1b 90%);
+      box-shadow:0 20px 60px rgba(220,38,38,.35), inset 0 0 0 14px #fee2e2, inset 0 0 0 28px #fef2f2}
+    .mic-ring.speaking{background:radial-gradient(closest-side, #f59e0b 0%, #d97706 90%);
+      box-shadow:0 20px 60px rgba(245,158,11,.35), inset 0 0 0 14px #fef3c7, inset 0 0 0 28px #fffbeb}
+    .mic-btn{width:clamp(148px, 40vw, 188px);height:clamp(148px, 40vw, 188px);border-radius:999px;border:none;
+      background:var(--brand);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 14px 30px rgba(11,122,74,.35);
+      transition:transform .08s ease}
+    .mic-btn:active{transform:scale(.98)}
+    .mic-btn.listening{background:#dc2626;animation:pulse 1.5s infinite}
+    .mic-btn.speaking{background:#f59e0b}
+    .mic-btn svg{width:clamp(44px, 11vw, 68px);height:auto}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+    .hint{font-size:clamp(16px, 5.3vw, 22px);line-height:1.35;color:#111827;text-align:center;opacity:.9;margin:6px 0 16px}
+    .grid{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:clamp(8px, 3.5vw, 14px);margin-top:8px}
+    .chip{display:flex;align-items:center;gap:12px;justify-content:center;padding:clamp(12px,3.2vw,16px) clamp(14px,3.8vw,18px);
+      border-radius:16px;border:1px solid #e5e7eb;background:#fff;color:#134e35;font-weight:600;font-size:clamp(16px,4.8vw,20px);
+      min-height:48px;touch-action:manipulation;cursor:pointer;transition:all .2s ease}
+    .chip:hover{background:#f7faf8;transform:translateY(-1px)}
+    @media (max-width:360px){.grid{grid-template-columns:1fr}.card{border-radius:28px}}
+    .status{color:#64748b;font-size:clamp(12px,3.6vw,14px);margin-top:8px;white-space:pre-wrap;text-align:center;min-height:20px}
+    .status.speaking{color:#f59e0b;font-weight:600}
+    .status.listening{color:#dc2626;font-weight:600}
+    .error{display:none;background:#fee2e2;border:1px solid #fecaca;color:#b91c1c;border-radius:12px;padding:10px;margin:12px auto 0;max-width:520px;font-size:14px}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:var(--pad)}
+    .overlay-card{background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.35);padding:22px;max-width:420px;width:100%;text-align:center}
+    .btn{background:var(--brand);color:#fff;border:none;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer;transition:background .2s ease}
+    .btn:hover{background:var(--brand-600)} .btn-muted{background:#e5e7eb;color:#111827}
+    .tts-info{background:#f0f9ff;border:1px solid #0ea5e9;color:#0c4a6e;border-radius:8px;padding:8px;margin:8px auto 0;max-width:520px;font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <!-- Оверлей разблокировки аудио + первичного запроса разрешения -->
+  <div id="overlay" class="overlay">
+    <div class="overlay-card">
+      <h3 style="margin:0 0 6px 0">Включите голосового консультанта</h3>
+      <p style="margin:0 0 14px 0;color:#374151">Нажмите один раз — разблокирую звук и попрошу доступ к микрофону (если нужно).</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button id="unlockBtn" class="btn">Включить звук</button>
+        <button id="askMicFromOverlay" class="btn btn-muted">Разрешить микрофон</button>
+      </div>
+      <div id="overlayHint" style="font-size:12px;color:#6b7280;margin-top:10px;line-height:1.3"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="inner">
+        <div class="brand" aria-label="ALTAI-BAD">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6 48l16-26 10 16 8-10 18 20H6z" fill="#0b7a4a"/>
+            <path d="M22 22l6 10 2-3-8-7z" fill="#fff"/>
+          </svg>
+          <div class="brand-title">ALTAI-BAD</div>
+        </div>
+
+        <div class="h1">Ваш консультант по здоровью</div>
+        <p class="lead">Помогу подобрать натуральные средства<br/>по симптомам и диагнозам</p>
+
+        <div class="mic-wrap">
+          <div id="micRing" class="mic-ring">
+            <button id="micBtn" class="mic-btn" title="Спросить голосом">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 1.75a3.25 3.25 0 0 0-3.25 3.25v6a3.25 3.25 0 0 0 6.5 0v-6A3.25 3.25 0 0 0 12 1.75Z"/>
+                <path d="M5 11.5a7 7 0 0 0 14 0"/>
+                <path d="M12 18.5v3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <p class="hint">Расскажите о своих симптомах или задайте вопрос о товарах</p>
+
+        <div class="grid">
+          <button class="chip" data-intent="health" aria-label="Товары для здоровья">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Товары
+          </button>
+          <button class="chip" data-intent="delivery" aria-label="Доставка">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h12v10H3z"/><path d="M15 10h4l3 3v4h-7V10z"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="17.5" cy="17" r="1.5"/></svg>
+            Доставка
+          </button>
+          <button class="chip" data-intent="consultation" aria-label="Консультация">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2M9 11V9a2 2 0 0 1 2-2v0a2 2 0 0 1 2 2v2M9 11h6"/></svg>
+            Консультация
+          </button>
+          <button class="chip" data-intent="contact" aria-label="Связаться">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.1 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.3 1.77.57 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.14a2 2 0 0 1 2.11-.45c.84.27 1.71.45 2.61.57A2 2 0 0 1 22 16.92Z"/></svg>
+            Связаться
+          </button>
+        </div>
+
+        <div id="status" class="status">Готова помочь. Нажмите «Включить звук», затем говорите или выберите тему.</div>
+        <div id="ttsInfo" class="tts-info"></div>
+        <div id="errorBox" class="error"></div>
+        <div style="display:flex;justify-content:center">
+          <button id="retryMicBtn" class="btn" style="display:none;margin-top:8px">Повторить запрос доступа к микрофону</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ====== Mobile viewport fix ======
+(function(){
+  function setVH(){
+    const vv=(window.visualViewport&&visualViewport.height)||window.innerHeight;
+    document.documentElement.style.setProperty('--vh', vv+'px');
+  }
+  setVH();
+  window.addEventListener('resize', setVH);
+  window.visualViewport && visualViewport.addEventListener('resize', setVH);
+})();
+
+window.addEventListener('DOMContentLoaded', ()=>{
+'use strict'
+
+// ===== Утилиты/среда =====
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth<=768) || ('ontouchstart' in window);
+const isIOS    = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isSecure = (window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost');
+
+// ===== TTS конфиг (по умолчанию — голос браузера) =====
+const TTS_CONFIG = {
+  openai:    { apiKey:'', model:'tts-1', voice:'shimmer', format:'mp3', speed:0.95, timeoutMs:15000 },
+  elevenlabs:{ apiKey:'', voiceId:'ymDCYd8puC7gYjxIamPt', model:'eleven_multilingual_v2', timeoutMs:25000 },
+  getPreferred(){ return this.openai.apiKey ? 'openai' : (this.elevenlabs.apiKey ? 'elevenlabs' : 'browser'); }
+};
+
+// ===== Глобальные переменные =====
+const player = new Audio(); player.preload = 'auto';
+const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAAACAAAAVGFkYQAAAAAA';
+
+const overlay     = document.getElementById('overlay');
+const overlayHint = document.getElementById('overlayHint');
+const unlockBtn   = document.getElementById('unlockBtn');
+const askMicFromOverlay = document.getElementById('askMicFromOverlay');
+const statusEl    = document.getElementById('status');
+const errorBox    = document.getElementById('errorBox');
+const ttsInfo     = document.getElementById('ttsInfo');
+const micBtn      = document.getElementById('micBtn');
+const micRing     = document.getElementById('micRing');
+const retryMicBtn = document.getElementById('retryMicBtn');
+
+let isListening=false, isSpeaking=false, audioUnlocked=false;
+let recognition=null, recognitionTimeout=null, speakQueue=[];
+let currentTTSProvider='browser', micPermission='unknown', microphoneReady=false;
+
+// ===== UI =====
+function setStatus(t, type=''){ statusEl.textContent=t; statusEl.className='status '+type; }
+function showError(t){ errorBox.style.display='block'; errorBox.textContent='⚠️ '+t; setTimeout(()=>errorBox.style.display='none',6000); }
+function showTTSInfo(t){ ttsInfo.textContent=t; ttsInfo.style.display='block'; setTimeout(()=>ttsInfo.style.display='none',4000); }
+function updateVisual(){ micBtn.className='mic-btn'+(isListening?' listening':'')+(isSpeaking?' speaking':''); micRing.className='mic-ring'+(isListening?' listening':'')+(isSpeaking?' speaking':''); }
+
+// ===== Подсказки и разрешения =====
+function renderPermissionHint(state){
+  let hint='';
+  if (!isSecure) hint+='Сайт открыт не по HTTPS. Используйте https://'+location.host+location.pathname+'\n';
+  if (state==='denied'){
+    hint += isIOS ? 'Safari iOS: Настройки > Safari > Камера и микрофон → Разрешить.' :
+                    'Chrome Android: иконка замка → Разрешения сайта → Микрофон → Разрешить.';
+  } else if (state==='prompt'){ hint+='Сейчас появится системный запрос. Нажмите «Разрешить».'; }
+  overlayHint.textContent=hint;
+}
+
+async function micPermissionState(){
+  if(!navigator.permissions?.query) return 'unknown';
+  try{
+    const p = await navigator.permissions.query({name:'microphone'});
+    micPermission = p.state; p.onchange = ()=> micPermission = p.state;
+    return p.state;
+  }catch{ return 'unknown'; }
+}
+
+// ВАЖНО: запрашиваем доступ и СРАЗУ ОСТАНАВЛИВАЕМ все треки, чтобы не занять микрофон!
+async function ensureMicAccess({forcePrompt=false}={}){
+  if(!isSecure){ showError('Нужен HTTPS (или localhost).'); return false; }
+  if(!navigator.mediaDevices?.getUserMedia){ showError('Браузер не поддерживает getUserMedia. Используйте Chrome/Safari.'); return false; }
+
+  const state = await micPermissionState();
+  if(state==='granted' && !forcePrompt){ microphoneReady=true; retryMicBtn.style.display='none'; return true; }
+
+  renderPermissionHint(state||'unknown');
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    // главный фикс:
+    stream.getTracks().forEach(t=>t.stop());
+    microphoneReady=true; retryMicBtn.style.display='none';
+    setStatus('Микрофон готов. Нажмите большую кнопку и говорите.');
+    return true;
+  }catch(e){
+    microphoneReady=false; retryMicBtn.style.display='inline-block';
+    const m = (e.name==='NotAllowedError') ? 'Доступ к микрофону запрещён. Разрешите в настройках сайта и обновите страницу.'
+            : (e.name==='NotFoundError')   ? 'Микрофон не найден. Подключите устройство записи.'
+            : (e.name==='NotReadableError')? 'Микрофон занят другим приложением.'
+            : (e.name==='SecurityError')    ? 'Безопасность браузера блокирует микрофон (проверьте HTTPS).'
+            : 'Не удалось получить доступ к микрофону.';
+    showError(m); return false;
+  }
+}
+
+// ===== Ответы домена =====
+function getHealthAdvice(text){
+  const t=text.toLowerCase().trim();
+  if(/сустав|артрит|артроз|позвоночник|спина|остеохондроз|радикулит|ревматизм|болит спина|болят суставы/.test(t))
+    return 'При проблемах с суставами и позвоночником рекомендую алтайские бальзамы с пантами, живицу кедровую и каменное масло. Хотите конкретные варианты?';
+  if(/желудок|кишечник|гастрит|язва|изжога|колит|пищеварение|запор|диарея|живот болит/.test(t))
+    return 'Для ЖКТ — травяные сборы, облепиховые бальзамы, масло кедрового ореха. При серьёзных симптомах — консультация врача.';
+  if(/иммунитет|простуда|грипп|орви|кашель|насморк|горло|температура|заболел|простыл/.test(t))
+    return 'Для иммунитета — мёд с пантами, эхинацея, сборы с шиповником. При первых признаках — живица, сиропы «Бобродок».';
+  if(/женское здоровье|менопауза|климакс|цистит|молочница|месячные|гормоны|женские проблемы/.test(t))
+    return 'Для женского здоровья — фитосвечи с боровой маткой/красной щёткой, бальзамы, сборы для нормализации цикла.';
+  if(/мужское здоровье|потенция|простатит|либидо|мужская сила|мужские проблемы/.test(t))
+    return 'Для мужского здоровья — панты марала, бальзам «Мужская энергия», продукты с живицей, секрет бобра.';
+  if(/сердце|давление|гипертония|холестерин|сосуды|атеросклероз|сердечные|кардио/.test(t))
+    return 'Для сердца и сосудов — каменное масло, сборы с боярышником, пантовые продукты. Контролируйте давление.';
+  if(/печень|гепатит|желчный|холецистит|детокс|очищение|печеночные/.test(t))
+    return 'Для печени — расторопша, каменное масло, чаи с бессмертником, бальзамы для мягкого детокса.';
+  if(/нервы|стресс|депрессия|бессонница|сон|тревога|невроз|нервная система/.test(t))
+    return 'Для стресса и сна — сборы с пустырником/валерианой, алтайские адаптогены, релакс-чаи.';
+  if(/диабет|сахар|глюкоза|инсулин|сахарный/.test(t))
+    return 'При диабете — сборы с черникой/створками фасоли, каменное масло, топинамбур. Это дополняет лечение, не заменяет.';
+  if(/похудение|лишний вес|диета|метаболизм|жир|целлюлит|худеть|похудеть/.test(t))
+    return 'Для веса — чаи для метаболизма, здоровое питание, бальзамы для обмена веществ, ягоды годжи.';
+  return null;
+}
+function replyFor(text){
+  const t=text.toLowerCase().trim(), h=getHealthAdvice(text);
+  if(h) return h;
+  if(/здравствуй|привет|добрый|доброе|хай|алло|добро пожаловать/.test(t))
+    return 'Здравствуйте! Я Анна, консультант ALTAI-BAD. Расскажите, что беспокоит, или спросите о товарах.';
+  if(/доставк|курьер|почт|получ|привез|сдэк|транспорт/.test(t))
+    return 'Доставляем по РФ курьерами и Почтой. Курьер от 900 ₽, от 1 дня. При полном курсе — доставка бесплатно! В какой город?';
+  if(/оплат|карт|цен|стоимост|сколько|руб|банк|платеж/.test(t))
+    return 'Способы оплаты: онлайн (карта/СБП), наложенный платёж на почте, либо курьеру.';
+  if(/товар|каталог|ассортимент|что есть|что продаете|бад|средства|продукц/.test(t))
+    return 'Более 7000 натуральных товаров: панты, бальзамы, живица, каменное масло, травы, косметика, мёд. Что именно интересует?';
+  if(/консультац|подбор|посовет|рекоменд|помог|выбрать|подскаж/.test(t))
+    return 'Подберу индивидуально по симптомам/диагнозам. Опишите ваши задачи. Можно позвонить 8-903-930-41-52.';
+  if(/телефон|контакт|связ|номер|звон|позвон/.test(t))
+    return 'Телефон: 8-903-930-41-52. Поможем подобрать натуральные средства под вашу задачу.';
+  if(/компан|altai|алтай|производ|качество|откуда|кто вы/.test(t))
+    return 'ALTAI-BAD — магазин натуральных средств. Работаем с алтайскими производителями, качество гарантируем.';
+  if(/спасиб|благодар|класс|супер|отлично|хорошо|замечательно/.test(t))
+    return 'Рада помочь! Если нужны ещё рекомендации — спрашивайте.';
+  if(/пока|до свидан|досвидан|бай|увидимся/.test(t))
+    return 'Всего доброго! Берегите здоровье.';
+  if(/помощ|что умеешь|что можешь|функции|возможности/.test(t))
+    return 'Подбираю натуральные средства по симптомам, отвечаю про доставку/оплату/товары.';
+  return 'Опишите симптомы или задачу — порекомендую подходящие натуральные средства.';
+}
+
+// ===== TTS (браузер по умолчанию) =====
+function getRuVoice(){
+  const v=speechSynthesis.getVoices();
+  const female=v.find(x=>/ru/i.test(x.lang)&&/anna|elena|marina|svetlana|irina|female/i.test(x.name));
+  const ru=v.find(x=>/ru/i.test(x.lang));
+  return female||ru||v[0];
+}
+function speakViaSpeechSynthesis(text){
+  return new Promise(res=>{
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      const voice=getRuVoice(); if(voice){u.voice=voice; u.lang='ru-RU';}
+      u.rate=isMobile?0.95:0.9; u.pitch=1; u.volume=0.95;
+      u.onend=res; u.onerror=()=>res();
+      speechSynthesis.speak(u);
+    }catch{res();}
+  });
+}
+async function speak(text){
+  if(!audioUnlocked) return;
+  isSpeaking=true; updateVisual(); setStatus('Говорю...', 'speaking');
+  try{ await speakViaSpeechSynthesis(String(text||'')); }
+  finally{ isSpeaking=false; updateVisual(); setStatus('Готова ответить на ваши вопросы'); }
+}
+
+// ===== Распознавание речи =====
+function initSpeechRecognition(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showError('Ваш браузер не поддерживает распознавание речи. Используйте Chrome/Safari.'); return null;}
+  const rec=new SR();
+  rec.lang='ru-RU';
+  rec.interimResults=true;
+  rec.continuous=false; // на мобиле стабильнее
+  rec.maxAlternatives=1;
+
+  let finalTxt=''; let hadAudio=false; let hadSpeech=false;
+
+  rec.onstart=()=>{
+    // если говорим — остановить TTS, чтобы не мешал микрофону
+    if(isSpeaking){ speechSynthesis.cancel(); player.pause(); isSpeaking=false; }
+    isListening=true; updateVisual(); setStatus('Слушаю... Говорите!', 'listening');
+    finalTxt=''; hadAudio=false; hadSpeech=false;
+    // автостоп через 15с молчания
+    recognitionTimeout=setTimeout(()=>{ try{rec.stop();}catch{} },15000);
+  };
+  rec.onaudiostart = ()=>{ hadAudio=true; setStatus('Слышу звук...', 'listening'); };
+  rec.onsoundstart = ()=>{ setStatus('Звук обнаружен...', 'listening'); };
+  rec.onspeechstart= ()=>{ hadSpeech=true; setStatus('Речь обнаружена — записываю', 'listening'); };
+
+  rec.onresult=(e)=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal){ finalTxt += (finalTxt?' ':'') + r[0].transcript; }
+      else { interim += r[0].transcript; }
+    }
+    if(interim.trim()) setStatus(`Слышу: "${interim}"`, 'listening');
+  };
+
+  rec.onend=()=>{
+    if(recognitionTimeout){ clearTimeout(recognitionTimeout); recognitionTimeout=null; }
+    isListening=false; updateVisual();
+    const t=finalTxt.trim();
+    if(t){ setStatus(`Вы сказали: "${t}"`); setTimeout(()=>speak(replyFor(t)),400); }
+    else if(hadSpeech || hadAudio){ setStatus('Не расслышала чётко. Попробуйте ещё раз, ближе к микрофону.'); }
+    else { setStatus('Речь не обнаружена. Говорите громче и чётче.'); }
+  };
+
+  rec.onerror=(ev)=>{
+    if(recognitionTimeout){ clearTimeout(recognitionTimeout); recognitionTimeout=null; }
+    isListening=false; updateVisual();
+    let msg='Ошибка распознавания речи';
+    if(ev.error==='not-allowed'){ msg='Нет доступа к микрофону. Разрешите в настройках сайта.'; retryMicBtn.style.display='inline-block'; }
+    else if(ev.error==='no-speech'){ msg='Речь не обнаружена. Попробуйте громче и ближе к микрофону.'; }
+    else if(ev.error==='audio-capture'){ msg='Проблема с микрофоном. Возможно, он занят другим приложением.'; }
+    else if(ev.error==='network'){ msg='Сетевая ошибка распознавания.'; }
+    showError(msg); setStatus('Готова ответить на ваши вопросы');
+  };
+  return rec;
+}
+
+// ===== Обработчики =====
+async function handleMicRequest(){ await ensureMicAccess({forcePrompt:true}); }
+retryMicBtn.addEventListener('click', handleMicRequest);
+askMicFromOverlay.addEventListener('click', handleMicRequest);
+
+micBtn.addEventListener('click', async ()=>{
+  if(!audioUnlocked){ showError('Сначала нажмите «Включить звук».'); return; }
+  if(isSpeaking){ speechSynthesis.cancel(); player.pause(); isSpeaking=false; updateVisual(); }
+  if(isListening){ try{ recognition && recognition.stop(); }catch{} return; }
+  const ok = await ensureMicAccess({forcePrompt:true}); if(!ok) return;
+  recognition = initSpeechRecognition(); if(!recognition) return;
+  try{ recognition.start(); }catch(e){ console.warn('start failed', e); }
+});
+
+// Быстрые ответы
+document.querySelectorAll('.chip').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(!audioUnlocked){ showError('Сначала включите звук'); return; }
+    const intent=btn.getAttribute('data-intent');
+    const text = intent==='health' ? 'У нас более 7000 натуральных товаров: панты, бальзамы, живица, каменное масло, травы, натуральная косметика. Какие задачи у вас?'
+               : intent==='delivery' ? 'Доставляем по России курьерами и Почтой. От 1 дня. При полном курсе — доставка бесплатно. В какой город?'
+               : intent==='consultation' ? 'Подберу средства под ваши симптомы. Можете позвонить специалисту: 8-903-930-41-52.'
+               : intent==='contact' ? 'Телефон: 8-903-930-41-52. Чем ещё помочь?'
+               : 'Готова помочь. Расскажите подробнее.';
+    speak(text);
+  });
+});
+
+// Приветствие/разблокировка
+function greet(){ speak('Здравствуйте! Я Анна, ваш консультант по натуральным средствам. Чем могу помочь?'); }
+async function unlockAudio(){
+  try{
+    if(!isSecure) renderPermissionHint('unknown');
+    currentTTSProvider = TTS_CONFIG.getPreferred();
+    const device = isMobile ? 'мобильном устройстве' : 'компьютере';
+    showTTSInfo(currentTTSProvider==='elevenlabs' ? 'Использую голос ElevenLabs' :
+               currentTTSProvider==='openai' ? 'Использую голос OpenAI' :
+               `Использую встроенный голос браузера на ${device}`);
+    player.src=SILENCE_WAV; try{ await player.play(); }catch{} player.pause();
+    if('speechSynthesis' in window) speechSynthesis.getVoices();
+    audioUnlocked=true;
+  } finally {
+    overlay.style.display='none'; overlay.setAttribute('aria-hidden','true');
+    setStatus('Готова ответить на ваши вопросы'); setTimeout(greet,800);
+  }
+}
+unlockBtn.addEventListener('click', unlockAudio);
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) unlockAudio(); });
+
+// Стартовые проверки
+try{
+  if(!isSecure){ showError('Нужен HTTPS/localhost. Встроенные браузеры приложений не подходят.'); setStatus('Работаю в ограниченном режиме'); }
+}catch(e){ showError('Ошибка инициализации: '+e.message); }
+
+if('speechSynthesis' in window){
+  speechSynthesis.addEventListener('voiceschanged', ()=>{ getRuVoice(); });
+  speechSynthesis.getVoices();
+}
+
+}); // DOMContentLoaded
+</script>
+</body>
+</html>
